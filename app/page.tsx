@@ -1,281 +1,160 @@
-"use client"
+'use client';
 
-import QRCode from 'qrcode.react';
-import { useState } from "react";
+import { useState } from 'react';
+import CategoryAccordion from '@/components/Form/CategoryAccordion';
+import PersonalInfoSection from '@/components/Form/PersonalInfoSection';
+import ContactInfoSection from '@/components/Form/ContactInfoSection';
+import AddressSection from '@/components/Form/AddressSection';
+import WebsitesSection from '@/components/Form/WebsitesSection';
+import NotesAndBirthdaySection from '@/components/Form/NotesAndBirthdaySection';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
+import GenerateButton from '@/components/GenerateButton';
+import ErrorMessage from '@/components/ErrorMessage';
+import useFormData from '@/hooks/useFormData';
 
-interface VCardFormValues {
-  firstName: string;
-  lastName: string;
-  orgTitle: string;
-  orgName: string;
-  orgStreet: string;
-  orgCity: string;
-  orgRegion: string;
-  orgPost: string;
-  orgCountry: string;
-  orgTel: string;
-  orgEmail: string;
-  orgUrl: string;
-  profilePic: string,
-}
+export default function GeneratePage() {
+  const { formData, updateFormData } = useFormData();
+  const [qrValue, setQrValue] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [openAccordion, setOpenAccordion] = useState<string | null>('personal');
 
-const initialFormValues: VCardFormValues = {
-  firstName: '',
-  lastName: '',
-  orgTitle: '',
-  orgName: '',
-  orgStreet: '',
-  orgCity: '',
-  orgRegion: '',
-  orgPost: '',
-  orgCountry: '',
-  orgTel: '',
-  orgEmail: '',
-  orgUrl: '',
-  profilePic: '',
-};
-export default function Home() {
-  const [formValues, setFormValues] = useState<VCardFormValues>(initialFormValues);
-  const [vcardString, setVcardString] = useState('');
-
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = event.target;
-    setFormValues({ ...formValues, [name]: value });
+  const handleToggleAccordion = (accordion: string) => {
+    setOpenAccordion((prev) => (prev === accordion ? null : accordion));
   };
 
-  const generateVcard = () => {
-    let vcard = 'BEGIN:VCARD\nVERSION:3.0\n';
+  const generateVCard = () => {
+    const {
+      personal,
+      contact,
+      workAddress,
+      homeAddress,
+      websites,
+      notesAndBirthday,
+    } = formData;
 
-    vcard += `N:${formValues.lastName};${formValues.firstName}\n`;
-    vcard += `FN:${formValues.firstName} ${formValues.lastName}\n`;
-
-    // Work information
-    if (formValues.orgName) {
-      vcard += `ORG:${formValues.orgName}\n`;
-    }
-    if (formValues.orgTitle) {
-      vcard += `TITLE:${formValues.orgTitle}\n`;
-    }
-    if (formValues.orgStreet || formValues.orgCity || formValues.orgRegion || formValues.orgPost || formValues.orgCountry) {
-      vcard += `ADR;TYPE=work:;;${formValues.orgStreet};${formValues.orgCity};${formValues.orgRegion};${formValues.orgPost};${formValues.orgCountry}\n`;
-    }
-    if (formValues.orgTel) {
-      vcard += `TEL;TYPE=work:${formValues.orgTel}\n`;
-    }
-    if (formValues.orgEmail) {
-      vcard += `EMAIL;TYPE=internet,work:${formValues.orgEmail}\n`;
-    }
-    if (formValues.orgUrl) {
-      vcard += `URL;TYPE=work:${formValues.orgUrl}\n`;
+    if (!personal.firstName || !personal.lastName) {
+      setError('First Name and Last Name are required.');
+      return;
     }
 
-    // Add profile picture
-    // if (formValues.profilePic) {
-    //   vcard += `PHOTO;TYPE=JPEG:${'https://avatars.githubusercontent.com/u/142899363?v=4.jpg'}\n`; 
-    // }
+    const vCard = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${personal.firstName} ${personal.lastName}`,
+      `N:${personal.lastName};${personal.firstName};;;`,
+      `TITLE:${personal.title}`,
+      `ORG:${personal.organization}`,
+      `TEL;TYPE=WORK,VOICE:${contact.workPhone}`,
+      `TEL;TYPE=HOME,VOICE:${contact.homePhone}`,
+      `TEL;TYPE=CELL,VOICE:${contact.mobilePhone}`,
+      `TEL;TYPE=FAX,WORK:${contact.workFax}`,
+      `EMAIL;TYPE=WORK,INTERNET:${contact.workEmail}`,
+      `EMAIL;TYPE=HOME,INTERNET:${contact.personalEmail}`,
+      `ADR;TYPE=WORK:;;${workAddress.street};${workAddress.city};${workAddress.state};${workAddress.zip};${workAddress.country}`,
+      `ADR;TYPE=HOME:;;${homeAddress.street};${homeAddress.city};${homeAddress.state};${homeAddress.zip};${homeAddress.country}`,
+      `URL:${websites.personalWebsite}`,
+      `URL;TYPE=WORK:${websites.companyWebsite}`,
+      `NOTE:${notesAndBirthday.notes}`,
+      `BDAY:${notesAndBirthday.birthday}`,
+      'END:VCARD',
+    ]
+      .filter((line) => !line.endsWith(':'))
+      .join('\n');
 
-    // Add profile picture
-    // if (formValues.profilePic) {
-    //   vcard += `LOGO;TYPE=PNG:${formValues.profilePic}\n`; 
-    // }
+    setQrValue(vCard);
+    setError('');
+  };
 
-    console.log(vcard)
-
-    vcard += 'END:VCARD';
-    setVcardString(vcard);
+  const downloadQRCode = (format: 'png' | 'svg') => {
+    if (qrValue) {
+      const canvas = document.getElementById('qr-code') as HTMLCanvasElement;
+      if (canvas) {
+        const url = canvas.toDataURL(`image/${format}`);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `vcard-qrcode.${format}`;
+        link.click();
+      }
+    }
   };
 
   return (
-    <main className="flex min-h-screen flex-col justify-between p-24">
-      <div className="flex flex-row w-full">
-        <div className="flex flex-col w-3/4">
-          <form className="flex flex-col gap-4" onSubmit={(e) => {
-            e.preventDefault();
-            generateVcard();
-          }}>
-            {/* <label htmlFor="profilePic" className="text-gray-700 font-medium">Profile Picture:</label>
-            <div className="flex flex-col ">
-              <input
-                type="url"
-                id="profilePic"
-                name="profilePic"
-                value={formValues.profilePic}
-                placeholder='URL'
-                onChange={handleChange}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-              />
-            </div> */}
-          
-            <label htmlFor="firstName" className="text-gray-700 font-medium">Full Name</label>
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="text"
-                  id="firstName"
-                  name="firstName"
-                  value={formValues.firstName}
-                  placeholder='First Name'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="text"
-                  id="lastName"
-                  name="lastName"
-                  value={formValues.lastName}
-                  placeholder='Last Name'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+    <div className="">
+      <div className="bg-white p-8 rounded-lg w-full max-w-8xl flex flex-col lg:flex-row gap-8">
+        {/* Left Side: Input Fields */}
+        <div className="w-full lg:w-1/2 space-y-6">
+          <h1 className="text-2xl font-bold mb-6">VCard QR Code Generator</h1>
 
-            <label htmlFor="firstName" className="text-gray-700 font-medium">Work Details</label>
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="text"
-                  id="orgTitle"
-                  name="orgTitle"
-                  value={formValues.orgTitle}
-                  placeholder='Job Title'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="text"
-                  id="orgName"
-                  name="orgName"
-                  value={formValues.orgName}
-                  placeholder='Organization Name'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+          {/* Personal Information */}
+          <CategoryAccordion
+            title="Personal Information"
+            isOpen={openAccordion === 'personal'}
+            onToggle={() => handleToggleAccordion('personal')}
+          >
+            <PersonalInfoSection
+              formData={formData.personal}
+              onChange={(field, value) => updateFormData('personal', field, value)}
+            />
+          </CategoryAccordion>
 
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="text"
-                  id="orgStreet"
-                  name="orgStreet"
-                  value={formValues.orgStreet}
-                  placeholder='Street Address'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="text"
-                  id="orgCity"
-                  name="orgCity"
-                  value={formValues.orgCity}
-                  placeholder='City'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+          {/* Contact Information */}
+          <CategoryAccordion
+            title="Contact Information"
+            isOpen={openAccordion === 'contact'}
+            onToggle={() => handleToggleAccordion('contact')}
+          >
+            <ContactInfoSection
+              formData={formData.contact}
+              onChange={(field, value) => updateFormData('contact', field, value)}
+            />
+          </CategoryAccordion>
 
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="text"
-                  id="orgRegion"
-                  name="orgRegion"
-                  value={formValues.orgRegion}
-                  placeholder='Region'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="text"
-                  id="orgPost"
-                  name="orgPost"
-                  value={formValues.orgPost}
-                  placeholder='Postal Code'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+          {/* Address */}
+          <CategoryAccordion
+            title="Address"
+            isOpen={openAccordion === 'address'}
+            onToggle={() => handleToggleAccordion('address')}
+          >
+            <AddressSection
+              formData={formData.workAddress}
+              onChange={(field, value) => updateFormData('workAddress', field, value)}
+            />
+          </CategoryAccordion>
 
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="text"
-                  id="orgCountry"
-                  name="orgCountry"
-                  value={formValues.orgCountry}
-                  placeholder='Country'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="tel"
-                  id="orgTel"
-                  name="orgTel"
-                  value={formValues.orgTel}
-                  placeholder='Phone Number'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+          {/* Websites */}
+          <CategoryAccordion
+            title="Websites"
+            isOpen={openAccordion === 'websites'}
+            onToggle={() => handleToggleAccordion('websites')}
+          >
+            <WebsitesSection
+              formData={formData.websites}
+              onChange={(field, value) => updateFormData('websites', field, value)}
+            />
+          </CategoryAccordion>
 
-            <div className="flex flex-row w-full">
-              <div className="flex flex-col w-full">
-                <input
-                  type="email"
-                  id="orgEmail"
-                  name="orgEmail"
-                  value={formValues.orgEmail}
-                  placeholder='Email Address'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex flex-col pl-3 w-full">
-                <input
-                  type="url"
-                  id="orgUrl"
-                  name="orgUrl"
-                  value={formValues.orgUrl}
-                  placeholder='Website'
-                  onChange={handleChange}
-                  className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-blue-500"
-                />
-              </div>
-            </div>
+          {/* Notes and Birthday */}
+          <CategoryAccordion
+            title="Notes and Birthday"
+            isOpen={openAccordion === 'notes'}
+            onToggle={() => handleToggleAccordion('notes')}
+          >
+            <NotesAndBirthdaySection
+              formData={formData.notesAndBirthday}
+              onChange={(field, value) => updateFormData('notesAndBirthday', field, value)}
+            />
+          </CategoryAccordion>
 
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            >
-              Generate vCard
-            </button>
-          </form>
+          {/* Error Message */}
+          {error && <ErrorMessage message={error} />}
+
+          {/* Generate Button */}
+          <GenerateButton onClick={generateVCard} />
         </div>
 
-        <div className="flex flex-col w-1/4 pl-9">
-          <h3 className="flex flex-col pb-12">QR code</h3>
-          <div className="flex justify-center py-32">
-            {vcardString && 
-              <QRCode value={vcardString} size={256} />
-            }
-          </div>
-        </div>
+        {/* Right Side: QR Code */}
+        <QRCodeDisplay qrValue={qrValue} onDownload={downloadQRCode} />
       </div>
-    </main>
+    </div>
   );
 }
